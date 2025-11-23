@@ -16,7 +16,7 @@ Dataset DataLoader::generateData(int numPoints, int dim, double minVal, double m
     std::uniform_real_distribution<> dis(minVal, maxVal); // Uniform Distribution
 
     for (int i = 0; i < numPoints; i++){
-        std::vector<double> coords(dim);
+        std::vector<double> coords(static_cast<size_t>(dim));
         for (int d = 0; d < dim; d++) {
             coords[d] = dis(gen);
         }

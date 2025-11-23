@@ -1,5 +1,4 @@
-#ifndef DATA_LOADER_H
-#define DATA_LOADER_H
+#pragma once
 
 #include "utils.h"
 #include <string>
@@ -14,5 +13,3 @@ public:
     //Function to print fragments of data (used for debugging)
     static void printData(const Dataset& data, int numLines = 5);
 };
-
-#endif // DATA_LOADER_H

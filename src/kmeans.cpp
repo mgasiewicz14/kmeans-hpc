@@ -10,6 +10,12 @@ KMeans::KMeans(int k, int maxIter, double threshold)
 void KMeans::initializeCentroids(const Dataset &data) {
     std::cout << "Initializing centroids..." << std::endl;
     centroids.clear();
+
+    if (data.size() < static_cast<size_t>(k)) {
+        std::cerr << "Error: Number of clusters k (" << k << ") is larger than dataset size (" << data.size() << ")." << std::endl;
+        return;
+    }
+
     std::vector<size_t> indices(data.size());
     for (size_t i = 0; i < indices.size(); i++) indices[i] = i;
 
@@ -69,7 +75,7 @@ bool KMeans::updateCentroids(const Dataset& data) {
         }
 
         for (size_t d = 0; d < dim; ++d) {
-            newCentroids[i].coords[d] /= counts[i];
+            newCentroids[i].coords[d] /= static_cast<double>(counts[i]);
         }
 
         //Check how far the centroid has shifted
@@ -88,6 +94,10 @@ bool KMeans::updateCentroids(const Dataset& data) {
 int KMeans::run(Dataset& data) {
     if (data.empty() || k <= 0) {
         std::cerr << "Invalid data or k parameter." << std::endl;
+        return 0;
+    }
+    if (data.size() < static_cast<size_t>(k)) {
+        std::cerr << "Error: Number of clusters k (" << k << ") is larger than dataset size (" << data.size() << ")." << std::endl;
         return 0;
     }
 
