@@ -1,5 +1,4 @@
-#ifndef KMEANS_H
-#define KMEANS_H
+#pragma once
 
 #include "utils.h"
 #include <vector>
@@ -19,7 +18,5 @@ public:
     KMeans(int k, int maxIter = 100, double threshold = 1e-4);
 
     int run(Dataset& data);
-    const std::vector<Point>& getCentroids() const {return centroids;}
+    [[nodiscard]] const std::vector<Point>& getCentroids() const {return centroids;}
 };
-
-#endif // KMEANS_H
