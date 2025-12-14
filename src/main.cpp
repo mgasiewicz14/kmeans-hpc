@@ -27,10 +27,10 @@ void runKMeansSequential(int repeat = 10) {
     std::cout << "Executing " << repeat << " runs to average results..." << std::endl;
 
     //Sim params
-    int numPoints = 200000;
+    int numPoints = 100000;
     int dim = 3;
     int k = 5;
-    int maxIters = 200;
+    int maxIters = 150;
 
     if (numPoints < k) {
         std::cerr << "Error: numPoints (" << numPoints << ") must be >= k (" << k << ")" << std::endl;
@@ -90,7 +90,7 @@ void runKMeansParallel(int repeat = 10) {
     std::cout << "Executing " << repeat << " runs to average results..." << std::endl;
 
     //Sim params
-    int numPoints = 100000;
+    int numPoints = 200000;
     int dim = 3;
     int k = 5;
     int maxIters = 150;
