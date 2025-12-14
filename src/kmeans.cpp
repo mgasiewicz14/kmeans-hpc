@@ -1,4 +1,5 @@
 #include "../include/kmeans.h"
+#include <chrono>
 #include <limits>
 #include <random>
 #include <iostream>
@@ -101,17 +102,55 @@ int KMeans::run(Dataset& data) {
         return 0;
     }
 
+    initTime = 0.0;
+    totalAssignTime = 0.0;
+    totalUpdateTime = 0.0;
+
+    auto startInit = std::chrono::high_resolution_clock::now();
+
     initializeCentroids(data);
+
+    auto endInit = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> diffInit = endInit - startInit;
+    initTime = diffInit.count();
 
     int iter = 0;
     bool converged = false;
 
     while (iter < maxIter && !converged) {
+
+        auto startAssign = std::chrono::high_resolution_clock::now();
         assignClusters(data);
+        auto endAssign = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> diffAssign = endAssign - startAssign;
+        totalAssignTime += diffAssign.count();
+
+        auto startUpdate = std::chrono::high_resolution_clock::now();
         converged = updateCentroids(data);
+        auto endUpdate = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> diffUpdate = endUpdate - startUpdate;
+        totalUpdateTime += diffUpdate.count();
 
         iter++;
     }
+
+    double totalTotalTime = initTime + totalAssignTime + totalUpdateTime;
+
+    std::cout << "\n========================================" << std::endl;
+    std::cout << "      DETAILED PROFILING REPORT" << std::endl;
+    std::cout << "========================================" << std::endl;
+    std::cout << "Total Iterations: " << iter << std::endl;
+    std::cout << "Total Wall Time:  " << totalTotalTime << " s" << std::endl;
+    std::cout << "----------------------------------------" << std::endl;
+    std::cout << "1. Initialization:      " << initTime << " s ("
+              << (initTime / totalTotalTime) * 100.0 << "%)" << std::endl;
+
+    std::cout << "2. AssignClusters (O(N)): " << totalAssignTime << " s ("
+              << (totalAssignTime / totalTotalTime) * 100.0 << "%)" << std::endl;
+
+    std::cout << "3. UpdateCentroids (O(N)): " << totalUpdateTime << " s ("
+              << (totalUpdateTime / totalTotalTime) * 100.0 << "%)" << std::endl;
+    std::cout << "========================================\n" << std::endl;
 
     return iter;
 }
