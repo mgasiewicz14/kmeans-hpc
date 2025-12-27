@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <iomanip>
 #include <mpi.h>
+#include <omp.h>
+#include <fstream>
 #include "../include/data_loader.h"
 #include "../include/kmeans.h"
 #include "../include/parallel_kmeans.h"
@@ -227,6 +229,61 @@ void runKMeansDistributed(int repeat = 10) {
     }
 }
 
+void runScalabilityAnalysis() {
+    std::cout << "--- Running Scalability Analysis (Strong Scaling) ---" << std::endl;
+
+    //Parameters
+    int numPoints = 500000;
+    int dim = 3;
+    int k = 10;
+    int maxIters = 150;
+    int repeat = 3;
+
+    std::vector<int> threadCount = {1, 2, 3, 4, 6, 8, 12, 16};
+
+    std::cout << "Generating dataset (" << numPoints << " points)..." << std::endl;
+    Dataset dataFixed = DataLoader::generateData(numPoints, dim, 0.0, 1000.0);
+
+    std::cout << "\n=== RESULTS CSV FORMAT ===" << std::endl;
+    std::cout << "Threads,AvgTime_s,Speedup,Efficiency" << std::endl;
+
+    double timeSequential = 0.0;
+
+    for (int t : threadCount) {
+        omp_set_num_threads(t);
+
+        double sumTime = 0.0;
+
+        for (int r = 0; r < repeat; ++r) {
+            Dataset data = dataFixed;
+            ParallelKMeans kmeans(k, maxIters);
+
+            auto start = std::chrono::high_resolution_clock::now();
+            kmeans.run(data);
+            auto end = std::chrono::high_resolution_clock::now();
+
+            std::chrono::duration<double> elapsed = end - start;
+            sumTime += elapsed.count();
+        }
+
+        double avgTime = sumTime / repeat;
+
+        if (t == 1) {
+            timeSequential = avgTime;
+        }
+
+        double speedup = timeSequential / avgTime;
+        double efficiency = speedup / t;
+
+        std::cout << t << ","
+                  << std::fixed << std::setprecision(5) << avgTime << ","
+                  << std::fixed << std::setprecision(2) << speedup << ","
+                  << std::fixed << std::setprecision(2) << efficiency << std::endl;
+    }
+    std::cout << "=== END CSV ===" << std::endl;
+}
+
+
 void runComparison() {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -360,6 +417,8 @@ int main(int argc, char* argv[]) {
             }
         } else if (mode == "--compare") {
             runComparison();
+        } else if (mode == "--scale") {
+            if (rank == 0) runScalabilityAnalysis();
         } else if (mode == "--mpi") {
             if (rank == 0) std::cout << "Running distributed MPI version..." << std::endl;
             runKMeansDistributed(10);

@@ -1,4 +1,5 @@
 #include "../include/parallel_kmeans.h"
+#include <chrono>
 #include <limits>
 #include <random>
 #include <iostream>
@@ -121,14 +122,35 @@ int ParallelKMeans::run(Dataset& data) {
         return 0;
     }
 
+    initTime = 0.0;
+    totalAssignTime = 0.0;
+    totalUpdateTime = 0.0;
+
+    auto startInit = std::chrono::high_resolution_clock::now();
+
     initializeCentroids(data);
+
+    auto endInit = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> diffInit = endInit - startInit;
+    initTime = diffInit.count();
 
     int iter = 0;
     bool converged = false;
 
     while (iter < maxIter && !converged) {
+
+        auto startAssign = std::chrono::high_resolution_clock::now();
         assignClusters(data);
+        auto endAssign = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> diffAssign = endAssign - startAssign;
+        totalAssignTime += diffAssign.count();
+
+        auto startUpdate = std::chrono::high_resolution_clock::now();
         converged = updateCentroids(data);
+        auto endUpdate = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> diffUpdate = endUpdate - startUpdate;
+        totalUpdateTime += diffUpdate.count();
+
         iter++;
     }
 

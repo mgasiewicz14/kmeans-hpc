@@ -8,6 +8,9 @@ private:
     int k;
     int maxIter;
     double threshold;
+    double initTime = 0.0;
+    double totalAssignTime = 0.0;
+    double totalUpdateTime = 0.0;
 
     std::vector<Point> centroids;
 
