@@ -30,7 +30,10 @@ endif()
 file(GLOB SRC_FILES src/*.cpp)
 
 # --- EXECUTABLE ---
-add_executable(kmeans_hpc ${SRC_FILES})
+add_executable(kmeans_hpc ${SRC_FILES}
+        include/profiler_utils.h
+        include/old_parallel_kmeans.h
+        src/old_parallel_kmeans.cpp)
 
 # --- INCLUDE DIRECTORIES ---
 # Dodajemy ścieżki nagłówkowe

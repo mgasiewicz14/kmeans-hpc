@@ -13,6 +13,8 @@
 #include "../include/parallel_kmeans.h"
 #include "../include/distributed_kmeans.h"
 #include "../include/utils.h"
+#include "../include/profiler_utils.h"
+#include "../include/old_parallel_kmeans.h"
 
 void runTest() {
     std::cout <<"--- Running Data Generation Test ---" << std::endl;
@@ -24,129 +26,112 @@ void runTest() {
     std::cout << "--- Test Finished! ---" << std::endl;
 }
 
-void runKMeansSequential(int repeat = 10) {
+void runKMeansSequential(int repeat = 5) {
     std::cout << "--- Running Sequential K-Means benchmark ---" << std::endl;
-    std::cout << "Executing " << repeat << " runs to average results..." << std::endl;
 
-    //Sim params
-    int numPoints = 100000;
-    int dim = 3;
-    int k = 5;
+    int numPoints = 3000000;
+    int dim = 1;
+    int k = 2;
     int maxIters = 150;
-
-    if (numPoints < k) {
-        std::cerr << "Error: numPoints (" << numPoints << ") must be >= k (" << k << ")" << std::endl;
-        return;
-    }
 
     Dataset dataTemp = DataLoader::generateData(numPoints, dim, 0.0, 1000.0);
 
-    std::vector<double> totalTimes;
-    std::vector<double> timePerIter;
-    std::vector<int> totalIters;
-
     for (int i = 0; i < repeat; ++i) {
         Dataset data = dataTemp;
+
+        std::cin.get();
 
         KMeans kmeans(k, maxIters);
 
-        auto start = std::chrono::high_resolution_clock::now();
+        double startCpu = ResourceProfiler::getCPUTime();
+        auto startWall = std::chrono::high_resolution_clock::now();
 
         int iters = kmeans.run(data);
 
-        auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed = end - start;
+        auto endWall = std::chrono::high_resolution_clock::now();
+        double endCpu = ResourceProfiler::getCPUTime();
 
-        totalTimes.push_back(elapsed.count());
-        totalIters.push_back(iters);
+        std::chrono::duration<double> elapsedWall = endWall - startWall;
+        double elapsedCpu = endCpu - startCpu;
 
-        if(iters > 0)
-            timePerIter.push_back(elapsed.count() / iters);
+        // Calculate utilization (100% = 1 core fully loaded)
+        double utilization = (elapsedCpu / elapsedWall.count()) * 100.0;
 
         std::cout << "Run " << (i + 1) << "/" << repeat
-                  << ": " << std::fixed << std::setprecision(4) << elapsed.count() << "s "
-                  << "(" << iters << " iters)" << std::endl;
+                  << " | Wall: " << std::fixed << std::setprecision(4) << elapsedWall.count() << "s"
+                  << " | CPU: " << elapsedCpu << "s"
+                  << " | Load: " << std::setprecision(1) << utilization << "%"
+                  << " (" << iters << " iters)" << std::endl;
     }
-
-    // Calculate metrics
-    double avgTime = std::accumulate(totalTimes.begin(), totalTimes.end(), 0.0) / repeat;
-    double avgIters = std::accumulate(totalIters.begin(), totalIters.end(), 0.0) / (double)repeat;
-    double avgTimePerIter = std::accumulate(timePerIter.begin(), timePerIter.end(), 0.0) / static_cast<double>(timePerIter.size());
-
-    double minTime = *std::min_element(totalTimes.begin(), totalTimes.end());
-    double maxTime = *std::max_element(totalTimes.begin(), totalTimes.end());
-
-    std::cout << "\n=== Sequential Benchmark Results (" << repeat << " runs) ===" << std::endl;
-    std::cout << "Total Time (Avg): " << avgTime << " s" << std::endl;
-    std::cout << "Total Time (Min): " << minTime << " s" << std::endl;
-    std::cout << "Total Time (Max): " << maxTime << " s" << std::endl;
-    std::cout << "Avg Iterations:   " << avgIters << std::endl;
-    std::cout << "-------------------------------------------" << std::endl;
-    std::cout << "AVG TIME PER ITERATION: " << avgTimePerIter << " s" << std::endl;
-    std::cout << "-------------------------------------------" << std::endl;
-    std::cout << "(Use 'Avg Time Per Iteration' for comparing OpenMP speedup)" << std::endl;
 }
 
 void runKMeansParallel(int repeat = 10) {
-    std::cout << "--- Running Parallel K-Means (OpenMP) benchmark ---" << std::endl;
-    std::cout << "Executing " << repeat << " runs to average results..." << std::endl;
+    std::cout << "--- Running Parallel K-Means (Optimized) benchmark ---" << std::endl;
 
-    //Sim params
-    int numPoints = 200000;
-    int dim = 3;
-    int k = 5;
+    int numPoints = 3000000;
+    int dim = 1;
+    int k = 2;
     int maxIters = 150;
-
-    if (numPoints < k) {
-        std::cerr << "Error: numPoints (" << numPoints << ") must be >= k (" << k << ")" << std::endl;
-        return;
-    }
 
     Dataset dataTemp = DataLoader::generateData(numPoints, dim, 0.0, 1000.0);
 
-    std::vector<double> totalTimes;
-    std::vector<double> timePerIter;
-    std::vector<int> totalIters;
-
     for (int i = 0; i < repeat; ++i) {
         Dataset data = dataTemp;
-
         ParallelKMeans kmeans(k, maxIters);
 
-        auto start = std::chrono::high_resolution_clock::now();
+        std::cin.get();
+
+        double startCpu = ResourceProfiler::getCPUTime();
+        auto startWall = std::chrono::high_resolution_clock::now();
 
         int iters = kmeans.run(data);
 
-        auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed = end - start;
+        auto endWall = std::chrono::high_resolution_clock::now();
+        double endCpu = ResourceProfiler::getCPUTime();
 
-        totalTimes.push_back(elapsed.count());
-        totalIters.push_back(iters);
-
-        if(iters > 0)
-            timePerIter.push_back(elapsed.count() / iters);
+        std::chrono::duration<double> elapsedWall = endWall - startWall;
+        double elapsedCpu = endCpu - startCpu;
+        double utilization = (elapsedCpu / elapsedWall.count()) * 100.0;
 
         std::cout << "Run " << (i + 1) << "/" << repeat
-                  << ": " << std::fixed << std::setprecision(4) << elapsed.count() << "s "
-                  << "(" << iters << " iters)" << std::endl;
+                  << " | Wall: " << std::fixed << std::setprecision(4) << elapsedWall.count() << "s"
+                  << " | CPU: " << elapsedCpu << "s"
+                  << " | Load: " << std::setprecision(1) << utilization << "%"
+                  << " (" << iters << " iters)" << std::endl;
     }
+}
 
-    // Calculate metrics
-    double avgTime = std::accumulate(totalTimes.begin(), totalTimes.end(), 0.0) / repeat;
-    double avgIters = std::accumulate(totalIters.begin(), totalIters.end(), 0.0) / (double)repeat;
-    double avgTimePerIter = std::accumulate(timePerIter.begin(), timePerIter.end(), 0.0) / static_cast<double>(timePerIter.size());
+void runOldParallelKMeans() {
+    std::cout << "--- Running OLD (Naive) Parallel K-Means ---" << std::endl;
 
-    double minTime = *std::min_element(totalTimes.begin(), totalTimes.end());
-    double maxTime = *std::max_element(totalTimes.begin(), totalTimes.end());
+    int numPoints = 3000000;
+    int dim = 1;
+    int k = 2;
+    int maxIters = 150;
 
-    std::cout << "\n=== Parallel Benchmark Results (" << repeat << " runs) ===" << std::endl;
-    std::cout << "Total Time (Avg): " << avgTime << " s" << std::endl;
-    std::cout << "Total Time (Min): " << minTime << " s" << std::endl;
-    std::cout << "Total Time (Max): " << maxTime << " s" << std::endl;
-    std::cout << "Avg Iterations:   " << avgIters << std::endl;
-    std::cout << "-------------------------------------------" << std::endl;
-    std::cout << "AVG TIME PER ITERATION: " << avgTimePerIter << " s" << std::endl;
-    std::cout << "-------------------------------------------" << std::endl;
+    Dataset data = DataLoader::generateData(numPoints, dim, 0.0, 1000.0);
+
+    OldParallelKMeans oldKmeans(k, maxIters);
+
+    std::cin.get();
+
+    double startCpu = ResourceProfiler::getCPUTime();
+    auto startWall = std::chrono::high_resolution_clock::now();
+
+    int iters = oldKmeans.run(data);
+
+    auto endWall = std::chrono::high_resolution_clock::now();
+    double endCpu = ResourceProfiler::getCPUTime();
+
+    std::chrono::duration<double> elapsedWall = endWall - startWall;
+    double elapsedCpu = endCpu - startCpu;
+    double utilization = (elapsedCpu / elapsedWall.count()) * 100.0;
+
+    std::cout << "\n=== OLD Benchmark Results ===" << std::endl;
+    std::cout << "Total Wall Time: " << elapsedWall.count() << " s" << std::endl;
+    std::cout << "Total CPU Time:  " << elapsedCpu << " s" << std::endl;
+    std::cout << "CPU Utilization: " << utilization << " %" << std::endl;
+    std::cout << "Iterations:      " << iters << std::endl;
 }
 
 void runKMeansDistributed(int repeat = 10) {
@@ -388,6 +373,39 @@ void runComparison() {
     }
 }
 
+void runEmpiricalAnalysis() {
+    std::cout << "--- EMPIRICAL ANALYSIS: Testing Time Complexity O(N) ---" << std::endl;
+    std::vector<int> test_sizes = {100000, 200000, 400000, 800000, 1600000, 3200000};
+
+    int dim = 3;
+    int k = 5;
+    int maxIters = 50;
+
+    std::ofstream csvFile("empirical_results.csv");
+    csvFile << "N,Time_Seconds\n";
+
+    for (int n : test_sizes) {
+        std::cout << "Testing N = " << n << " ... " << std::flush;
+
+        Dataset data = DataLoader::generateData(n, dim, 0.0, 1000.0);
+
+        ParallelKMeans kmeans(k, maxIters);
+
+        auto start = std::chrono::high_resolution_clock::now();
+
+        kmeans.run(data);
+
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = end - start;
+
+        std::cout << "Done! Time: " << elapsed.count() << "s" << std::endl;
+        csvFile << n << "," << elapsed.count() << "\n";
+    }
+
+    csvFile.close();
+    std::cout << "Results saved to 'empirical_results.csv'. Run Python script now." << std::endl;
+}
+
 int main(int argc, char* argv[]) {
     int provided;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided);
@@ -406,17 +424,21 @@ int main(int argc, char* argv[]) {
         if (mode == "--seq") {
             if (rank == 0) {
                 std::cout << "Running sequential version..." << std::endl;
-                runKMeansSequential(10);
+                runKMeansSequential(1);
             }
         } else if (mode == "--test") {
             if (rank == 0) runTest();
         } else if (mode == "--omp") {
             if (rank == 0) {
                 std::cout << "Running parallel OpenMP version..." << std::endl;
-                runKMeansParallel(10);
+                runKMeansParallel(1);
             }
+        } else if (mode == "--old") {
+            if (rank == 0) runOldParallelKMeans();
         } else if (mode == "--compare") {
             runComparison();
+        } else if (mode == "--empirical") {
+            runEmpiricalAnalysis();
         } else if (mode == "--scale") {
             if (rank == 0) runScalabilityAnalysis();
         } else if (mode == "--mpi") {
