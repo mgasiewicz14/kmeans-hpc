@@ -29,10 +29,11 @@ void runTest() {
 void runKMeansSequential(int repeat = 5) {
     std::cout << "--- Running Sequential K-Means benchmark ---" << std::endl;
 
-    int numPoints = 3000000;
-    int dim = 1;
-    int k = 2;
+    int numPoints = 5000000;
+    int dim = 3;
+    int k = 10;
     int maxIters = 150;
+
 
     Dataset dataTemp = DataLoader::generateData(numPoints, dim, 0.0, 1000.0);
 
@@ -68,10 +69,11 @@ void runKMeansSequential(int repeat = 5) {
 void runKMeansParallel(int repeat = 10) {
     std::cout << "--- Running Parallel K-Means (Optimized) benchmark ---" << std::endl;
 
-    int numPoints = 3000000;
-    int dim = 1;
-    int k = 2;
+    int numPoints = 5000000;
+    int dim = 3;
+    int k = 10;
     int maxIters = 150;
+
 
     Dataset dataTemp = DataLoader::generateData(numPoints, dim, 0.0, 1000.0);
 
@@ -135,84 +137,67 @@ void runOldParallelKMeans() {
 }
 
 void runKMeansDistributed(int repeat = 10) {
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    int world_rank, world_size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
-    if (rank == 0) {
-        std::cout << "--- Running Distributed K-Means (MPI) benchmark ---" << std::endl;
-        std::cout << "Executing " << repeat << " runs to average results..." << std::endl;
-    }
-
-    //Simulation parameters
-    int numPoints = 100000;
+    int numPoints = 5000000;
     int dim = 3;
-    int k = 5;
+    int k = 10;
     int maxIters = 150;
 
     Dataset dataTemp;
-    if (rank == 0) {
+
+    if (world_rank == 0) {
+        std::cout << "--- Running Distributed K-Means (MPI) benchmark ---" << std::endl;
+        std::cout << "Nodes: " << world_size << " | Points: " << numPoints << std::endl;
         dataTemp = DataLoader::generateData(numPoints, dim, 0.0, 1000.0);
     }
 
-    std::vector<double> totalTimes;
-    std::vector<double> timePerIter;
-    std::vector<int> totalIters;
+    MPI_Barrier(MPI_COMM_WORLD);
 
     for (int i = 0; i < repeat; ++i) {
         Dataset data;
-
-        if (rank == 0) {
+        if (world_rank == 0) {
             data = dataTemp;
         }
 
         DistributedKMeans mpiKmeans(k, maxIters);
 
-        //Synchronization before the clock stats counting time
         MPI_Barrier(MPI_COMM_WORLD);
 
-        auto start = std::chrono::high_resolution_clock::now();
+        auto startWall = std::chrono::high_resolution_clock::now();
+
+        double startCpuLocal = ResourceProfiler::getCPUTime();
 
         int iters = mpiKmeans.run(data);
 
-        //Wait until each process finishes calculating
+        double endCpuLocal = ResourceProfiler::getCPUTime();
+
         MPI_Barrier(MPI_COMM_WORLD);
 
-        auto end = std::chrono::high_resolution_clock::now();
+        auto endWall = std::chrono::high_resolution_clock::now();
 
-        if (rank == 0) {
-            std::chrono::duration<double> elapsed = end - start;
+        double elapsedCpuLocal = endCpuLocal - startCpuLocal;
+        std::chrono::duration<double> elapsedWall = endWall - startWall;
 
-            totalTimes.push_back(elapsed.count());
-            totalIters.push_back(iters);
+        double totalCpuTimeAllNodes = 0.0;
 
-            if (iters > 0)
-                timePerIter.push_back(elapsed.count() / iters);
+        MPI_Reduce(&elapsedCpuLocal, &totalCpuTimeAllNodes, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+
+        if (world_rank == 0) {
+            double maxPossibleCpuTime = elapsedWall.count() * world_size;
+            double utilization = (totalCpuTimeAllNodes / maxPossibleCpuTime) * 100.0;
 
             std::cout << "Run " << (i + 1) << "/" << repeat
-                      << ": " << std::fixed << std::setprecision(4) << elapsed.count() << "s "
-                      << "(" << iters << " iters)" << std::endl;
+                      << " | Wall: " << std::fixed << std::setprecision(4) << elapsedWall.count() << "s"
+                      << " | Total CPU: " << std::setprecision(4) << totalCpuTimeAllNodes << "s"
+                      << " | Cluster Load: " << std::setprecision(1) << utilization << "%"
+                      << " (" << iters << " iters)" << std::endl;
         }
     }
-
-    //Calculate metrics (master only)
-    if (rank == 0) {
-        double avgTime = std::accumulate(totalTimes.begin(), totalTimes.end(), 0.0) / repeat;
-        double avgIters = std::accumulate(totalIters.begin(), totalIters.end(), 0.0) / (double)repeat;
-        double avgTimePerIter = std::accumulate(timePerIter.begin(), timePerIter.end(), 0.0) / static_cast<double>(timePerIter.size());
-
-        double minTime = *std::min_element(totalTimes.begin(), totalTimes.end());
-        double maxTime = *std::max_element(totalTimes.begin(), totalTimes.end());
-
-        std::cout << "\n=== Distributed Benchmark Results (" << repeat << " runs) ===" << std::endl;
-        std::cout << "Total Time (Avg): " << avgTime << " s" << std::endl;
-        std::cout << "Total Time (Min): " << minTime << " s" << std::endl;
-        std::cout << "Total Time (Max): " << maxTime << " s" << std::endl;
-        std::cout << "Avg Iterations:   " << avgIters << std::endl;
-        std::cout << "-------------------------------------------" << std::endl;
-        std::cout << "AVG TIME PER ITERATION: " << avgTimePerIter << " s" << std::endl;
-        std::cout << "-------------------------------------------" << std::endl;
-    }
 }
+
 
 void runScalabilityAnalysis() {
     std::cout << "--- Running Scalability Analysis (Strong Scaling) ---" << std::endl;
@@ -443,7 +428,7 @@ int main(int argc, char* argv[]) {
             if (rank == 0) runScalabilityAnalysis();
         } else if (mode == "--mpi") {
             if (rank == 0) std::cout << "Running distributed MPI version..." << std::endl;
-            runKMeansDistributed(10);
+            runKMeansDistributed(1);
         } else {
             if (rank == 0) std::cout << "Unknown argument. Use one of: --seq, --omp, --compare, --mpi" << std::endl;
         }
